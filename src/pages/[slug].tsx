@@ -1,15 +1,13 @@
-import type { InferGetStaticPropsType, NextPage } from "next";
+import type { GetStaticProps, InferGetStaticPropsType, NextPage } from "next";
 import Head from "next/head";
 import { PageLayout } from "~/components/layout";
 import { generateSSGHelper } from "~/server/helpers/ssgHelper";
 import { api } from "~/utils/api";
 import Image from "next/image";
 
-const propicsize = 128;
-
 type PageProps =InferGetStaticPropsType<typeof getStaticProps>;
 
-const ProfilePage: NextPage<PageProps> = ({username}) => {
+const ProfilePage: NextPage<{ username: string }>  = ({username}) => {
   const { data } = api.profile.getUserByUsername.useQuery({
     username,
   });
@@ -43,7 +41,7 @@ const ProfilePage: NextPage<PageProps> = ({username}) => {
 };
 
 
-export const getStaticProps  = async (context) => {
+export const getStaticProps: GetStaticProps  = async (context) => {
   const ssg = generateSSGHelper();
   const slug = context.params?.slug;
 
