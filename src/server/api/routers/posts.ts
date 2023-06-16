@@ -6,6 +6,7 @@ import { createTRPCRouter, privateProcedure, publicProcedure } from "~/server/ap
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { filterUserForClient } from "~/server/helpers/filterUserForClient";
+import type { Post } from "@prisma/client";
 
 // create a new ratelimiter that allows 3 requests per 1 minute
 const ratelimit = new Ratelimit({
@@ -14,15 +15,7 @@ const ratelimit = new Ratelimit({
     analytics: true
 });
 
-
-export const postsRouter = createTRPCRouter({
-
-  getAll: publicProcedure.query(async ({ ctx }) => {
-    const posts = await ctx.prisma.post.findMany({
-        take: 100,
-        orderBy: [{createdAt: 'desc'}],
-    });
-
+const addUserDataToPosts = async (posts: Post[]) => {
     const users = (
         await clerkClient.users.getUserList({
             userId: posts.map((post) => post.authorId),
@@ -30,7 +23,6 @@ export const postsRouter = createTRPCRouter({
         })
     ).map(filterUserForClient);
 
-    console.log(users);
     return posts.map((post) => {
         const author = users.find((user) => user.id === post.authorId);
         if (!author || ! author.username) throw new TRPCError({code: "INTERNAL_SERVER_ERROR", 
@@ -43,7 +35,32 @@ export const postsRouter = createTRPCRouter({
             },
         }
     });
+};
+
+export const postsRouter = createTRPCRouter({
+
+  getAll: publicProcedure.query(async ({ ctx }) => {
+    const posts = await ctx.prisma.post.findMany({
+        take: 100,
+        orderBy: [{createdAt: 'desc'}],
+    });
+
+    return addUserDataToPosts(posts);
+
   }),
+  getPostsByUserId: publicProcedure
+  .input(
+    z.object({
+        userId: z.string(),
+    }))
+    .query(({ctx, input}) => ctx.prisma.post.findMany({
+        where: {
+            authorId: input.userId,
+        },
+        take: 100,
+        orderBy: [{createdAt: 'desc'}],
+    }).then(addUserDataToPosts)
+  ),
   create: privateProcedure
     .input(
         z.object({
